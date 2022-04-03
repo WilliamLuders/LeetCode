@@ -12,9 +12,6 @@ namespace LeetCode
         {
             if (a.Length > b.Length)
                 return MergeMedian(b, a);
-            //if (a.Length == 0)
-            //    return Median(b);
-            bool evenCount = (a.Length + b.Length) % 2 == 0;
 
             return SearchForMedian(b, a);
         }
@@ -22,29 +19,38 @@ namespace LeetCode
         private static double SearchForMedian(int[] a, int[] b)
         {
             bool evenCount = (a.Length + b.Length) % 2 == 0;
-            int aCheck;
-            if (evenCount)
-                aCheck = a.Length / 2 - 1;
-            else
-                aCheck = a.Length / 2;
+
+            int aCheckIndex = a.Length / 2;
             int aSearchJump = Max(a.Length / 4, 1);
-            while (aSearchJump > 0)
+            bool checkIndexUpdated;
+            do
             {
-                var medianSearchResult = IsMedian(aCheck, a, b, out int nextHighest);
+                checkIndexUpdated = false;
+                var medianSearchResult
+                    = IsMedian(aCheckIndex, a, b, out int? otherMedian);
                 if (medianSearchResult == MedianSearchResult.Median)
                 {
                     if (evenCount)
-                        return (a[aCheck] + nextHighest) / 2.0;
+                        return (a[aCheckIndex] + otherMedian.Value) / 2.0;
                     else
-                        return a[aCheck];
+                        return a[aCheckIndex];
                 }
 
                 if (medianSearchResult == MedianSearchResult.TooHigh)
-                    aCheck -= aSearchJump;
+                {
+                    aCheckIndex -= aSearchJump;
+                    if (aSearchJump > 0)
+                        checkIndexUpdated = true;
+                }
                 else
-                    aCheck += aSearchJump;
-                aSearchJump /= 2;
-            }
+                {
+                    aCheckIndex += aSearchJump;
+                    if (aSearchJump > 0)
+                        checkIndexUpdated = true;
+                }
+                Console.WriteLine($"Search index: {aCheckIndex}");
+                aSearchJump = Max(aSearchJump / 2, 1);
+            } while (checkIndexUpdated);
             return SearchForMedian(b, a);
         }
 
@@ -54,42 +60,77 @@ namespace LeetCode
         /// <param name="i">The index to check in array a.</param>
         /// <param name="a">The first sorted array.</param>
         /// <param name="b">The second sorted array.</param>
-        /// <param name="nextHighest">Next highest value if i-th value is the median. Ignore otherwise</param>
+        /// <param name="otherMedian">Other median value if i-th value is the median. Null if i-th value is singular median.</param>
         /// <returns>True if ith element of array a is the median value.</returns>
-        public static MedianSearchResult IsMedian(int i, int[] a, int[] b, out int nextHighest)
+        public static MedianSearchResult IsMedian(int i, int[] a, int[] b, out int? otherMedian)
         {
-            int medianPosition = (a.Length + b.Length - 1) / 2;
-            nextHighest = 0;
+            bool evenCount = (a.Length + b.Length) % 2 == 0;
+            int mergedMedianPosition = (a.Length + b.Length - 1) / 2;
+            otherMedian = null;
 
             int highestInLowSubArray;
             int lowestInHighSubArray;
             int elementToCheck = a[i];
-            if (b.Length == 0)
+
+            int highestInLowSubArrayIndex = mergedMedianPosition - i - 1;
+            if (highestInLowSubArrayIndex < 0)
+                highestInLowSubArray = int.MinValue;
+            else if (highestInLowSubArrayIndex >= b.Length)
+                highestInLowSubArray = int.MaxValue;
+            else
+                highestInLowSubArray = b[highestInLowSubArrayIndex];
+
+            int lowestInHighSubArrayIndex = mergedMedianPosition - i;
+            if (lowestInHighSubArrayIndex >= b.Length)
+                lowestInHighSubArray = int.MaxValue;
+            else if (lowestInHighSubArrayIndex < 0)
+                lowestInHighSubArray = int.MinValue;
+            else
+                lowestInHighSubArray = b[lowestInHighSubArrayIndex];
+
+            MedianSearchResult isMedian = 
+                InRange(elementToCheck, highestInLowSubArray, lowestInHighSubArray);
+            if (isMedian == MedianSearchResult.Median)
             {
-                if (i == medianPosition)
-                {
-                    nextHighest = a[i + 1];
-                    return MedianSearchResult.Median;
-                }
-                if (i < medianPosition)
-                    return MedianSearchResult.TooLow;
-                if (i > medianPosition)
-                    return MedianSearchResult.TooHigh;
+                if (evenCount)
+                    otherMedian = Min(a[i + 1], lowestInHighSubArray);
             }
-
-            highestInLowSubArray = b[medianPosition - i - 1];
-            lowestInHighSubArray = b[medianPosition - i];
-
-            if (elementToCheck >= highestInLowSubArray)
+            else if (isMedian == MedianSearchResult.TooHigh && evenCount)
             {
-                if (elementToCheck <= lowestInHighSubArray)
+                highestInLowSubArrayIndex = mergedMedianPosition - i;
+                if (highestInLowSubArrayIndex < 0)
+                    highestInLowSubArray = int.MinValue;
+                else if (highestInLowSubArrayIndex >= b.Length)
+                    highestInLowSubArray = int.MaxValue;
+                else
+                    highestInLowSubArray = b[highestInLowSubArrayIndex];
+
+                lowestInHighSubArrayIndex = mergedMedianPosition - i + 1;
+                if (lowestInHighSubArrayIndex >= b.Length)
+                    lowestInHighSubArray = int.MaxValue;
+                else if (lowestInHighSubArrayIndex < 0)
+                    lowestInHighSubArray = int.MinValue;
+                else
+                    lowestInHighSubArray = b[lowestInHighSubArrayIndex];
+
+                isMedian = InRange(elementToCheck, highestInLowSubArray, lowestInHighSubArray);
+                if (isMedian == MedianSearchResult.Median)
                 {
-                    nextHighest = Min(a[i + 1], lowestInHighSubArray);
-                    return MedianSearchResult.Median;
+                    otherMedian = Max(a[i-1], highestInLowSubArray);
                 }
+            }
+            return isMedian;
+        }
+
+        private static MedianSearchResult InRange(int test, int lowEnd, int highEnd)
+        {
+            if (lowEnd > highEnd)
+                throw new Exception("Low end higher than high end of range");
+            if (test < lowEnd)
+                return MedianSearchResult.TooLow;
+            if (test > highEnd)
                 return MedianSearchResult.TooHigh;
-            }
-            return MedianSearchResult.TooLow;
+            return MedianSearchResult.Median;
         }
 
         private static int Min(int a, int b)
@@ -100,15 +141,6 @@ namespace LeetCode
         private static int Max(int a, int b)
         {
             return a > b ? a : b;
-        }
-
-        private static double Median(int[] array)
-        {
-            if (array.Length % 2 == 0)
-                return (array[array.Length / 2]
-                    + array[array.Length / 2 - 1]) / 2.0;
-            else
-                return (array[array.Length / 2]);
         }
     }
 
