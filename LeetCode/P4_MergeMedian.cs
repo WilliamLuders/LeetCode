@@ -10,49 +10,9 @@ namespace LeetCode
     {
         public static double MergeMedian(int[] a, int[] b)
         {
-            if (a.Length > b.Length)
-                return MergeMedian(b, a);
-
-            return SearchForMedian(b, a);
+            return SearchForMedian(a, b);
         }
 
-        private static double SearchForMedian(int[] a, int[] b)
-        {
-            bool evenCount = (a.Length + b.Length) % 2 == 0;
-
-            int aCheckIndex = a.Length / 2;
-            int aSearchJump = Max(a.Length / 4, 1);
-            bool checkIndexUpdated;
-            do
-            {
-                checkIndexUpdated = false;
-                var medianSearchResult
-                    = IsMedian(aCheckIndex, a, b, out int? otherMedian);
-                if (medianSearchResult == MedianSearchResult.Median)
-                {
-                    if (evenCount)
-                        return (a[aCheckIndex] + otherMedian.Value) / 2.0;
-                    else
-                        return a[aCheckIndex];
-                }
-
-                if (medianSearchResult == MedianSearchResult.TooHigh)
-                {
-                    aCheckIndex -= aSearchJump;
-                    if (aSearchJump > 0)
-                        checkIndexUpdated = true;
-                }
-                else
-                {
-                    aCheckIndex += aSearchJump;
-                    if (aSearchJump > 0)
-                        checkIndexUpdated = true;
-                }
-                Console.WriteLine($"Search index: {aCheckIndex}");
-                aSearchJump = Max(aSearchJump / 2, 1);
-            } while (checkIndexUpdated);
-            return SearchForMedian(b, a);
-        }
 
         /// <summary>
         /// Check if the ith element in array a is the median.
@@ -60,87 +20,91 @@ namespace LeetCode
         /// <param name="i">The index to check in array a.</param>
         /// <param name="a">The first sorted array.</param>
         /// <param name="b">The second sorted array.</param>
-        /// <param name="otherMedian">Other median value if i-th value is the median. Null if i-th value is singular median.</param>
-        /// <returns>True if ith element of array a is the median value.</returns>
+        /// <param name="otherMedian">
+        /// Other median value if there are an even number of elements and 
+        /// i-th value is the lower median. Null if there is an odd number of elements.
+        /// </param>
+        /// <returns>
+        /// True if i-th element of array a is the median value and there is an odd number of elements.
+        /// True if i-th element of array a is the lower median value and there is an even number of elements.
+        /// </returns>
         public static MedianSearchResult IsMedian(int i, int[] a, int[] b, out int? otherMedian)
         {
             bool evenCount = (a.Length + b.Length) % 2 == 0;
             int mergedMedianPosition = (a.Length + b.Length - 1) / 2;
             otherMedian = null;
 
-            int highestInLowSubArray;
-            int lowestInHighSubArray;
-            int elementToCheck = a[i];
+            int lowArrayEndValue;
+            int highArrayStartValue;
+            int valueToCheck = a[i];
 
-            int highestInLowSubArrayIndex = mergedMedianPosition - i - 1;
-            if (highestInLowSubArrayIndex < 0)
-                highestInLowSubArray = int.MinValue;
-            else if (highestInLowSubArrayIndex >= b.Length)
-                highestInLowSubArray = int.MaxValue;
+            int lowArrayEnd = mergedMedianPosition - i - 1;
+            int highArrayStart = mergedMedianPosition - i;
+            
+            if (lowArrayEnd < 0)
+                lowArrayEndValue = int.MinValue;
+            else if (lowArrayEnd >= b.Length)
+                lowArrayEndValue = int.MaxValue;
             else
-                highestInLowSubArray = b[highestInLowSubArrayIndex];
+                lowArrayEndValue = b[lowArrayEnd];
 
-            int lowestInHighSubArrayIndex = mergedMedianPosition - i;
-            if (lowestInHighSubArrayIndex >= b.Length)
-                lowestInHighSubArray = int.MaxValue;
-            else if (lowestInHighSubArrayIndex < 0)
-                lowestInHighSubArray = int.MinValue;
+            if (highArrayStart >= b.Length)
+                highArrayStartValue = int.MaxValue;
+            else if (highArrayStart < 0)
+                highArrayStartValue = int.MinValue;
             else
-                lowestInHighSubArray = b[lowestInHighSubArrayIndex];
+                highArrayStartValue = b[highArrayStart];
 
-            MedianSearchResult isMedian = 
-                InRange(elementToCheck, highestInLowSubArray, lowestInHighSubArray);
-            if (isMedian == MedianSearchResult.Median)
+            if (lowArrayEndValue <= valueToCheck && valueToCheck <= highArrayStartValue)
             {
                 if (evenCount)
-                    otherMedian = Min(a[i + 1], lowestInHighSubArray);
-            }
-            else if (isMedian == MedianSearchResult.TooHigh && evenCount)
-            {
-                highestInLowSubArrayIndex = mergedMedianPosition - i;
-                if (highestInLowSubArrayIndex < 0)
-                    highestInLowSubArray = int.MinValue;
-                else if (highestInLowSubArrayIndex >= b.Length)
-                    highestInLowSubArray = int.MaxValue;
-                else
-                    highestInLowSubArray = b[highestInLowSubArrayIndex];
-
-                lowestInHighSubArrayIndex = mergedMedianPosition - i + 1;
-                if (lowestInHighSubArrayIndex >= b.Length)
-                    lowestInHighSubArray = int.MaxValue;
-                else if (lowestInHighSubArrayIndex < 0)
-                    lowestInHighSubArray = int.MinValue;
-                else
-                    lowestInHighSubArray = b[lowestInHighSubArrayIndex];
-
-                isMedian = InRange(elementToCheck, highestInLowSubArray, lowestInHighSubArray);
-                if (isMedian == MedianSearchResult.Median)
                 {
-                    otherMedian = Max(a[i-1], highestInLowSubArray);
+                    if (i + 1 < a.Length)
+                        otherMedian = Min(a[i + 1], highArrayStartValue);
+                    else
+                        otherMedian = highArrayStartValue;
                 }
+                return MedianSearchResult.Median;
             }
-            return isMedian;
+            else if (valueToCheck > highArrayStartValue)
+            {
+                return MedianSearchResult.TooHigh;
+            }
+            else
+            {
+                return MedianSearchResult.TooLow;
+            }
         }
 
-        private static MedianSearchResult InRange(int test, int lowEnd, int highEnd)
+        private static double SearchForMedian(int[] a, int[] b)
         {
-            if (lowEnd > highEnd)
-                throw new Exception("Low end higher than high end of range");
-            if (test < lowEnd)
-                return MedianSearchResult.TooLow;
-            if (test > highEnd)
-                return MedianSearchResult.TooHigh;
-            return MedianSearchResult.Median;
+            bool evenCount = (a.Length + b.Length) % 2 == 0;
+
+            int mid;
+            int l = 0;
+            int r = a.Length - 1;
+
+            while (l <= r)
+            {
+                mid = l + (r - l) / 2;
+                var medianSearchResult = IsMedian(mid, a, b, out int? otherMedian);
+                if (medianSearchResult == MedianSearchResult.Median)
+                    if (evenCount)
+                        return (a[mid] + otherMedian.Value) / 2.0;
+                    else
+                        return a[mid];
+                else if (medianSearchResult == MedianSearchResult.TooHigh)
+                    r = mid - 1;
+                else
+                    l = mid + 1;
+            }
+            
+            return SearchForMedian(b, a);
         }
 
         private static int Min(int a, int b)
         {
             return a < b ? a : b;
-        }
-
-        private static int Max(int a, int b)
-        {
-            return a > b ? a : b;
         }
     }
 
